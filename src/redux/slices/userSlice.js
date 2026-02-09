@@ -1,7 +1,10 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 
-// Use relative API paths so dev server proxy can forward requests to backend
-const API_BASE = "https://chat-app-backend-steel-eight.vercel.app";
+// Use relative API paths in development so Vite dev server proxy forwards requests to backend.
+// In production use the absolute backend URL.
+const API_BASE = import.meta.env.DEV
+    ? ""
+    : "https://chat-app-backend-steel-eight.vercel.app";
 
 // --- Async Thunks ---
 
