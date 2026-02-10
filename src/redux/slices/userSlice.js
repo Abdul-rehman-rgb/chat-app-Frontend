@@ -4,7 +4,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 // In production use the absolute backend URL.
 const API_BASE = import.meta.env.DEV
     ? ""
-    : "https://chat-app-backend-steel-eight.vercel.app/";
+    : "https://chat-app-backend-steel-eight.vercel.app";
 
 // --- Async Thunks ---
 
