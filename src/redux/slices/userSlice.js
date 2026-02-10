@@ -4,13 +4,17 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 // In production use the absolute backend URL.
 const API_BASE = import.meta.env.DEV
     ? ""
-    : "https://chat-app-backend-steel-eight.vercel.app";
+    : "https://chat-app-backend-steel-eight.vercel.app/";
 
 // --- Async Thunks ---
 
 export const registerUser = createAsyncThunk("user/registerUser", async (formData, { rejectWithValue }) => {
     try {
-        const res = await fetch(`${API_BASE}/api/v1/user/register`, { method: "POST", body: formData });
+        const res = await fetch(`${API_BASE}/api/v1/user/register`, { 
+            method: "POST", 
+            body: formData,
+            credentials: 'include'
+        });
         const data = await res.json();
         if (!res.ok) return rejectWithValue(data?.message || "Signup failed.");
         return data;
@@ -22,8 +26,8 @@ export const loginUser = createAsyncThunk("user/loginUser", async (credentials, 
         const res = await fetch(`${API_BASE}/api/v1/user/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify(credentials),
+            credentials: 'include'
         });
         const data = await res.json();
         if (!res.ok) return rejectWithValue(data?.message || "Login failed.");
@@ -31,26 +35,51 @@ export const loginUser = createAsyncThunk("user/loginUser", async (credentials, 
     } catch (err) { return rejectWithValue("Network error."); }
 });
 
-export const logoutUser = createAsyncThunk("user/logout", async (_, { rejectWithValue }) => {
+export const logoutUser = createAsyncThunk("user/logout", async (_, { rejectWithValue, getState }) => {
     try {
-        const res = await fetch(`${API_BASE}/api/v1/user/logout`, { method: "POST", credentials: "include" });
+        const token = getState().user.token;
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        
+        const res = await fetch(`${API_BASE}/api/v1/user/logout`, { 
+            method: "POST",
+            credentials: 'include', 
+            headers
+        });
         if (!res.ok) return rejectWithValue("Logout failed.");
         return null;
     } catch (err) { return rejectWithValue("Network error during logout."); }
 });
 
-export const fetchCurrentUser = createAsyncThunk("user/fetchCurrentUser", async (_, { rejectWithValue }) => {
+export const fetchCurrentUser = createAsyncThunk("user/fetchCurrentUser", async (_, { rejectWithValue, getState }) => {
     try {
-        const res = await fetch(`${API_BASE}/api/v1/user/me`, { method: "GET", credentials: "include" });
+        const token = getState().user.token;
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        
+        const res = await fetch(`${API_BASE}/api/v1/user/me`, { 
+            method: "GET",
+            credentials: 'include', 
+            headers
+        });
         const data = await res.json();
         if (!res.ok) return rejectWithValue(data?.message || "Failed to fetch user.");
         return data;
     } catch (err) { return rejectWithValue("Network error."); }
 });
 
-export const fetchUsers = createAsyncThunk("user/fetchUsers", async (_, { rejectWithValue }) => {
+export const fetchUsers = createAsyncThunk("user/fetchUsers", async (_, { rejectWithValue, getState }) => {
     try {
-        const res = await fetch(`${API_BASE}/api/v1/user`, { method: "GET", credentials: "include" });
+        const token = getState().user.token;
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        
+        const res = await fetch(`${API_BASE}/api/v1/user`, { 
+            credentials: 'include',
+             
+            method: "GET", 
+            headers
+        });
         const data = await res.json();
         if (!res.ok) return rejectWithValue(data?.message || "Failed to fetch users.");
         // Handling various response structures
@@ -59,9 +88,17 @@ export const fetchUsers = createAsyncThunk("user/fetchUsers", async (_, { reject
 });
 
 // Fetch Messages Thunk
-export const fetchMessages = createAsyncThunk("user/fetchMessages", async (id, { rejectWithValue }) => {
+export const fetchMessages = createAsyncThunk("user/fetchMessages", async (id, { rejectWithValue, getState }) => {
     try {
-        const res = await fetch(`${API_BASE}/api/v1/message/${id}`, { method: "GET", credentials: "include" });
+        const token = getState().user.token;
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        
+        const res = await fetch(`${API_BASE}/api/v1/message/${id}`, { 
+            credentials: 'include' ,
+            method: "GET", 
+            headers
+        });
         const data = await res.json();
         if (!res.ok) return rejectWithValue(data?.message || "Failed to fetch messages.");
         return data; // Backend se jo messages array aa raha hai
@@ -71,11 +108,18 @@ export const fetchMessages = createAsyncThunk("user/fetchMessages", async (id, {
 // Send message (text or file)
 export const sendMessage = createAsyncThunk(
     "user/sendMessage",
-    async ({ id, formData }, { rejectWithValue }) => {
+    async ({ id, formData }, { rejectWithValue, getState }) => {
         try {
+            const token = getState().user.token;
+            const headers = new Headers();
+            if (token) {
+                headers.append("Authorization", `Bearer ${token}`);
+            }
+            
             const res = await fetch(`${API_BASE}/api/v1/message/send/${id}`, {
+                credentials: 'include',
                 method: "POST",
-                credentials: "include",
+                headers: headers,
                 body: formData,
             });
             const data = await res.json().catch(() => ({}));
@@ -91,6 +135,7 @@ export const sendMessage = createAsyncThunk(
 
 const initialState = {
     user: JSON.parse(localStorage.getItem("user")) || null,
+    token: JSON.parse(localStorage.getItem("user"))?.token || null,
     users: [],
     messages: [], // Chat messages yahan store honge
     loading: false,
@@ -118,6 +163,7 @@ const userSlice = createSlice({
         },
         logoutLocal: (state) => {
             state.user = null;
+            state.token = null;
             state.messages = [];
             localStorage.removeItem("user");
         },
@@ -135,12 +181,14 @@ const userSlice = createSlice({
                 state.success = true;
                 state.message = action.payload?.message || "Login successful!";
                 state.user = action.payload;
+                state.token = action.payload?.token || null;
                 localStorage.setItem("user", JSON.stringify(action.payload));
             })
             .addCase(loginUser.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload || "Login failed.";
                 state.user = null;
+                state.token = null;
             })
 
             // User List Cases
@@ -188,6 +236,7 @@ const userSlice = createSlice({
             // Logout
             .addCase(logoutUser.fulfilled, (state) => {
                 state.user = null;
+                state.token = null;
                 state.users = [];
                 state.messages = [];
                 localStorage.removeItem("user");
